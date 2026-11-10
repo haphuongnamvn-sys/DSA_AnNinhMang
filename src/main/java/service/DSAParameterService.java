@@ -15,38 +15,60 @@ public class DSAParameterService {
     public ParameterValidationResult validate(DSAParameters parameters) {
         List<String> errors = new ArrayList<>();
         if (parameters == null) {
-            errors.add("Tham số không được để trống");
+            errors.add("Dữ liệu tham số rỗng, vui lòng nhập đầy đủ");
             return new ParameterValidationResult(errors);
         }
 
-        BigInteger p = parseField(parameters.getP(), "P", errors);
-        BigInteger q = parseField(parameters.getQ(), "Q", errors);
-        BigInteger g = parseField(parameters.getG(), "G", errors);
-        BigInteger x = parseField(parameters.getX(), "X", errors);
-        BigInteger y = parseField(parameters.getY(), "Y", errors);
+        String pStr = parameters.getP();
+        String qStr = parameters.getQ();
+        String gStr = parameters.getG();
+        String xStr = parameters.getX();
+        String yStr = parameters.getY();
 
-        if (p != null && (p.signum() <= 0 || !p.isProbablePrime(PRIME_CERTAINTY))) {
-            errors.add("P không phải số nguyên tố");
+        // Kiểm tra thiếu từng trường trước
+        if (pStr == null || pStr.isBlank()) errors.add("Thiếu P – vui lòng nhập số nguyên tố P");
+        if (qStr == null || qStr.isBlank()) errors.add("Thiếu Q – vui lòng nhập số nguyên tố Q");
+        if (gStr == null || gStr.isBlank()) errors.add("Thiếu G – vui lòng nhập phần tử sinh G");
+        if (xStr == null || xStr.isBlank()) errors.add("Thiếu X – vui lòng nhập khóa bí mật X");
+        if (yStr == null || yStr.isBlank()) errors.add("Thiếu Y – vui lòng nhập khóa công khai Y");
+
+        if (!errors.isEmpty()) {
+            return new ParameterValidationResult(errors);
         }
 
-        if (q != null && (q.signum() <= 0 || !q.isProbablePrime(PRIME_CERTAINTY))) {
-            errors.add("Q không phải số nguyên tố");
+        BigInteger p = parseField(pStr, "P", errors);
+        BigInteger q = parseField(qStr, "Q", errors);
+        BigInteger g = parseField(gStr, "G", errors);
+        BigInteger x = parseField(xStr, "X", errors);
+        BigInteger y = parseField(yStr, "Y", errors);
+
+        if (p != null && p.signum() <= 0) {
+            errors.add("P phải là số dương");
+        } else if (p != null && !p.isProbablePrime(PRIME_CERTAINTY)) {
+            errors.add("P không phải số nguyên tố – hãy kiểm tra lại giá trị P");
         }
 
-        if (p != null && q != null && q.signum() > 0 && !p.subtract(BigInteger.ONE).mod(q).equals(BigInteger.ZERO)) {
-            errors.add("Q không chia hết P - 1");
+        if (q != null && q.signum() <= 0) {
+            errors.add("Q phải là số dương");
+        } else if (q != null && !q.isProbablePrime(PRIME_CERTAINTY)) {
+            errors.add("Q không phải số nguyên tố – hãy kiểm tra lại giá trị Q");
         }
 
-        if (!isValidGenerator(p, q, g)) {
-            errors.add("G không hợp lệ");
+        if (p != null && q != null && q.signum() > 0 && p.isProbablePrime(PRIME_CERTAINTY) && q.isProbablePrime(PRIME_CERTAINTY)
+                && !p.subtract(BigInteger.ONE).mod(q).equals(BigInteger.ZERO)) {
+            errors.add("Q không chia hết (P - 1) – P và Q không tương thích");
         }
 
-        if (q == null || x == null || !BigIntegerUtil.isBetweenExclusive(x, BigInteger.ZERO, q)) {
-            errors.add("X không nằm trong khoảng hợp lệ");
+        if (g != null && p != null && q != null && !isValidGenerator(p, q, g)) {
+            errors.add("G không hợp lệ – G phải thỏa G^Q ≡ 1 (mod P) và 1 < G < P");
         }
 
-        if (!isValidY(p, g, x, y)) {
-            errors.add("Y không khớp với X");
+        if (q != null && x != null && !BigIntegerUtil.isBetweenExclusive(x, BigInteger.ZERO, q)) {
+            errors.add("X không hợp lệ – X phải nằm trong khoảng (0, Q)");
+        }
+
+        if (p != null && g != null && x != null && y != null && !isValidY(p, g, x, y)) {
+            errors.add("Y không khớp với X – Y phải thỏa Y = G^X mod P");
         }
 
         return new ParameterValidationResult(errors);
@@ -58,17 +80,21 @@ public class DSAParameterService {
         BigInteger g = BigIntegerUtil.parseRequired(gValue, "G");
 
         List<String> errors = new ArrayList<>();
-        if (p.signum() <= 0 || !p.isProbablePrime(PRIME_CERTAINTY)) {
-            errors.add("P không phải số nguyên tố");
+        if (p.signum() <= 0) {
+            errors.add("P phải là số dương");
+        } else if (!p.isProbablePrime(PRIME_CERTAINTY)) {
+            errors.add("P không phải số nguyên tố – giá trị P trong tệp khóa bị sai");
         }
-        if (q.signum() <= 0 || !q.isProbablePrime(PRIME_CERTAINTY)) {
-            errors.add("Q không phải số nguyên tố");
+        if (q.signum() <= 0) {
+            errors.add("Q phải là số dương");
+        } else if (!q.isProbablePrime(PRIME_CERTAINTY)) {
+            errors.add("Q không phải số nguyên tố – giá trị Q trong tệp khóa bị sai");
         }
         if (q.signum() > 0 && !p.subtract(BigInteger.ONE).mod(q).equals(BigInteger.ZERO)) {
-            errors.add("Q không chia hết P - 1");
+            errors.add("Q không chia hết (P - 1) – tệp khóa bị hỏng hoặc không đúng cặp");
         }
         if (!isValidGenerator(p, q, g)) {
-            errors.add("G không hợp lệ");
+            errors.add("G không hợp lệ – tệp khóa bị hỏng hoặc không đúng cặp");
         }
         if (!errors.isEmpty()) {
             throw new IllegalArgumentException(String.join("\n", errors));
@@ -77,28 +103,40 @@ public class DSAParameterService {
     }
 
     public PrivateKeyValues validatePrivateKey(DSAKeyPairModel key) {
-        if (key == null || !"DSA".equalsIgnoreCase(key.getAlgorithm())) {
-            throw new IllegalArgumentException("Tệp khóa bí mật không đúng định dạng DSA");
+        if (key == null) {
+            throw new IllegalArgumentException("Tệp không đúng định dạng JSON khóa DSA");
+        }
+        if (!"DSA".equalsIgnoreCase(key.getAlgorithm())) {
+            throw new IllegalArgumentException("Tệp này không phải khóa DSA (algorithm='" + key.getAlgorithm() + "')");
+        }
+        if (key.getX() == null || key.getX().isBlank()) {
+            throw new IllegalArgumentException("Tệp này là khóa công khai, không phải khóa bí mật – hãy chọn đúng tệp khóa bí mật");
         }
         DomainParameters domain = parseAndValidateDomain(key.getP(), key.getQ(), key.getG());
         BigInteger x = BigIntegerUtil.parseRequired(key.getX(), "X");
         if (!BigIntegerUtil.isBetweenExclusive(x, BigInteger.ZERO, domain.q())) {
-            throw new IllegalArgumentException("X không nằm trong khoảng hợp lệ");
+            throw new IllegalArgumentException("Khóa bí mật X không hợp lệ – X phải nằm trong khoảng (0, Q)");
         }
         return new PrivateKeyValues(domain.p(), domain.q(), domain.g(), x);
     }
 
     public PublicKeyValues validatePublicKey(DSAKeyPairModel key) {
-        if (key == null || !"DSA".equalsIgnoreCase(key.getAlgorithm())) {
-            throw new IllegalArgumentException("Tệp khóa công khai không đúng định dạng DSA");
+        if (key == null) {
+            throw new IllegalArgumentException("Tệp không đúng định dạng JSON khóa DSA");
+        }
+        if (!"DSA".equalsIgnoreCase(key.getAlgorithm())) {
+            throw new IllegalArgumentException("Tệp này không phải khóa DSA (algorithm='" + key.getAlgorithm() + "')");
+        }
+        if (key.getY() == null || key.getY().isBlank()) {
+            throw new IllegalArgumentException("Tệp khóa không chứa khóa công khai Y – tệp bị hỏng hoặc sai loại");
         }
         DomainParameters domain = parseAndValidateDomain(key.getP(), key.getQ(), key.getG());
         BigInteger y = BigIntegerUtil.parseRequired(key.getY(), "Y");
         if (!BigIntegerUtil.isBetweenExclusive(y, BigInteger.ZERO, domain.p())) {
-            throw new IllegalArgumentException("Y không nằm trong khoảng hợp lệ");
+            throw new IllegalArgumentException("Khóa công khai Y không hợp lệ – Y phải nằm trong khoảng (0, P)");
         }
         if (!y.modPow(domain.q(), domain.p()).equals(BigInteger.ONE)) {
-            throw new IllegalArgumentException("Y không khớp với tham số DSA");
+            throw new IllegalArgumentException("Khóa công khai Y không khớp với tham số P, Q – tệp bị hỏng hoặc không đúng cặp khóa");
         }
         return new PublicKeyValues(domain.p(), domain.q(), domain.g(), y);
     }

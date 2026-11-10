@@ -38,6 +38,8 @@ public class VerifyController {
     @FXML private TextArea fileInfoArea;
     @FXML private TextArea fileHashArea;
     @FXML private Label fileStatusMessage;
+    
+    @FXML private VBox emptyStatePreview;
 
     private final DSAVerifyService verifyService = new DSAVerifyService();
     private final FileService fileService = new FileService();
@@ -82,8 +84,14 @@ public class VerifyController {
     @FXML
     private void handleVerifyText() {
         try {
-            if (textSignature == null || textPublicKey == null) {
-                throw new IllegalArgumentException("Vui lòng chọn đầy đủ văn bản gốc, tệp chữ ký và khóa công khai.");
+            if (textInput.getText() == null || textInput.getText().isBlank()) {
+                throw new IllegalArgumentException("Vui lòng nhập nội dung văn bản gốc cần xác thực.");
+            }
+            if (textSignature == null) {
+                throw new IllegalArgumentException("Vui lòng chọn tệp chữ ký JSON.");
+            }
+            if (textPublicKey == null) {
+                throw new IllegalArgumentException("Vui lòng chọn tệp khóa công khai JSON.");
             }
             DSAVerifyService.VerificationResult result =
                     verifyService.verifyText(textInput.getText(), textSignature, textPublicKey);
@@ -92,7 +100,7 @@ public class VerifyController {
         } catch (Exception ex) {
             LogService.getInstance().addLog("VERIFY", "Xác thực văn bản thất bại: " + ex.getMessage(), "FAIL");
             setTextStatus(ex.getMessage(), false);
-            AlertUtil.error(window(), "Lỗi xác thực văn bản", ex.getMessage());
+            AlertUtil.error(window(), "Lỗi xác thực", ex.getMessage());
         }
     }
 
@@ -125,6 +133,10 @@ public class VerifyController {
             originalFileLabel.setText(file.getAbsolutePath());
             setFileStatus("Đã đọc tệp gốc", true);
             filePreviewManager.render(file, info);
+            
+            if(emptyStatePreview != null) {
+                emptyStatePreview.setVisible(false); emptyStatePreview.setManaged(false);
+            }
         } catch (Exception ex) {
             setFileStatus("Không thể đọc tệp gốc: " + ex.getMessage(), false);
             AlertUtil.error(window(), "Lỗi đọc tệp", ex.getMessage());
@@ -154,8 +166,14 @@ public class VerifyController {
     @FXML
     private void handleVerifyFile() {
         try {
-            if (originalFile == null || fileSignature == null || filePublicKey == null) {
-                throw new IllegalArgumentException("Vui lòng chọn đầy đủ tệp gốc, tệp chữ ký và khóa công khai.");
+            if (originalFile == null) {
+                throw new IllegalArgumentException("Vui lòng chọn tệp gốc cần xác thực.");
+            }
+            if (fileSignature == null) {
+                throw new IllegalArgumentException("Vui lòng chọn tệp chữ ký JSON.");
+            }
+            if (filePublicKey == null) {
+                throw new IllegalArgumentException("Vui lòng chọn tệp khóa công khai JSON.");
             }
             DSAVerifyService.VerificationResult result =
                     verifyService.verifyFile(originalFile.toPath(), fileSignature, filePublicKey);
@@ -167,7 +185,7 @@ public class VerifyController {
         } catch (Exception ex) {
             LogService.getInstance().addLog("VERIFY", "Xác thực tệp thất bại: " + ex.getMessage(), "FAIL");
             setFileStatus(ex.getMessage(), false);
-            AlertUtil.error(window(), "Lỗi xác thực tệp", ex.getMessage());
+            AlertUtil.error(window(), "Lỗi xác thực", ex.getMessage());
         }
     }
 
@@ -181,6 +199,10 @@ public class VerifyController {
         filePublicKeyLabel.setText("Chưa chọn khóa công khai");
         filePreviewManager.clear();
         setFileStatus("Đã làm mới phần xác thực tệp", true);
+        
+        if(emptyStatePreview != null) {
+            emptyStatePreview.setVisible(true); emptyStatePreview.setManaged(true);
+        }
     }
 
     @FXML
@@ -210,14 +232,13 @@ public class VerifyController {
 
         try {
             DSASignatureModel signature = fileService.readJson(file, DSASignatureModel.class);
-            if (signature == null || !"DSA".equalsIgnoreCase(signature.getAlgorithm())
-                    || !expectedType.equalsIgnoreCase(signature.getDataType())) {
-                throw new IllegalArgumentException("Tệp chữ ký không đúng định dạng hoặc bị hỏng.");
+            if (signature == null || !"DSA".equalsIgnoreCase(signature.getAlgorithm())) {
+                throw new IllegalArgumentException("Tệp này không phải chữ ký DSA hợp lệ.");
             }
             return signature;
         } catch (Exception ex) {
-            LogService.getInstance().addLog("VERIFY", "Lỗi định dạng chữ ký: " + ex.getMessage(), "FAIL");
-            AlertUtil.error(window(), "Chữ ký không hợp lệ", ex.getMessage());
+            LogService.getInstance().addLog("VERIFY", "Lỗi tệp chữ ký: " + ex.getMessage(), "FAIL");
+            AlertUtil.error(window(), "Tệp chữ ký không hợp lệ", ex.getMessage());
             return null;
         }
     }

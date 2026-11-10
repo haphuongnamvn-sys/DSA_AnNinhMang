@@ -74,19 +74,10 @@
             </GridPane>
         </VBox>
 
-        <VBox spacing="18" styleClass="key-config-card" prefWidth="330" maxWidth="380">
-            <HBox alignment="CENTER_LEFT" spacing="12">
-                <Label text="Kiểm tra tham số" styleClass="panel-title"/>
-            </HBox>
+        <VBox spacing="18" styleClass="key-config-card" minWidth="450" prefWidth="500" maxWidth="600">
 
-            <VBox spacing="10" styleClass="key-info-box">
-                <Label text="Quy tắc kiểm tra" styleClass="section-title"/>
-                <Label text="Hệ thống kiểm tra p, q là số nguyên tố, q chia hết p - 1, g hợp lệ và y khớp với x."
-                       wrapText="true" styleClass="muted-label"/>
-            </VBox>
-
-            <Button maxWidth="Infinity" onAction="#handleValidate" styleClass="success-button" text="Kiểm tra tham số"/>
-            <Button maxWidth="Infinity" onAction="#handleSave" styleClass="primary-button" text="Lưu tham số"/>
+            <Button maxWidth="Infinity" onAction="#handleValidate" styleClass="success-button" text="Tạo khóa"/>
+            <Button maxWidth="Infinity" onAction="#handleSave" styleClass="primary-button" text="Lưu cặp khóa"/>
             <Button maxWidth="Infinity" onAction="#handleClear" styleClass="danger-button" text="Làm mới"/>
 
             <VBox spacing="8" styleClass="status-card" VBox.vgrow="ALWAYS">

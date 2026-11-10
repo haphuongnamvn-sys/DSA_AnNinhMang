@@ -13,74 +13,82 @@ public class DSAVerifyService {
     private final DSAParameterService parameterService = new DSAParameterService();
 
     public VerificationResult verifyText(String originalText, DSASignatureModel signature, DSAKeyPairModel publicKey) throws Exception {
-        if (originalText == null) {
-            throw new IllegalArgumentException("Văn bản gốc không được để trống");
+        if (originalText == null || originalText.isBlank()) {
+            throw new IllegalArgumentException("Văn bản gốc không được để trống – vui lòng nhập nội dung cần xác thực");
         }
-        ensureSignature(signature, "TEXT");
+        ensureSignature(signature);
         DSAParameterService.PublicKeyValues keyValues = parameterService.validatePublicKey(publicKey);
         String hashAlgorithm = HashService.normalizeAlgorithm(signature.getHashAlgorithm());
         byte[] currentHash = hashService.digestText(originalText, hashAlgorithm);
         String currentHashHex = HashService.toHex(currentHash);
         String initialHash = signature.getHash();
+        if (initialHash == null || initialHash.isBlank()) {
+            initialHash = signature.getFileHash();
+        }
 
         if (initialHash != null && !initialHash.isBlank()
                 && !currentHashHex.equalsIgnoreCase(initialHash)) {
             return VerificationResult.failed(ResultCode.CONTENT_CHANGED,
-                    "Xác thực thất bại: Nội dung đã bị chỉnh sửa sau khi ký.")
+                    "Nội dung văn bản đã bị thay đổi sau khi ký – mã băm hiện tại không khớp với mã băm gốc.")
                     .withHashes(initialHash, currentHashHex);
         }
 
         VerificationComputation computation = verifyHash(currentHash, signature, keyValues);
         return computation.valid()
-                ? VerificationResult.success("Xác thực thành công")
+                ? VerificationResult.success("Xác thực thành công – văn bản còn nguyên vẹn và chữ ký hợp lệ")
                 .withHashes(initialHash, currentHashHex)
                 .withComputation(computation)
                 : VerificationResult.failed(ResultCode.PUBLIC_KEY_OR_SIGNATURE_INVALID,
-                "Xác thực thất bại: Chữ ký không hợp lệ hoặc không khớp với khóa công khai.")
+                "Chữ ký không hợp lệ hoặc không khớp với khóa công khai – có thể chữ ký đã bị sửa đổi hoặc sai khóa.")
                 .withHashes(initialHash, currentHashHex)
                 .withComputation(computation);
     }
 
     public VerificationResult verifyFile(Path originalFile, DSASignatureModel signature, DSAKeyPairModel publicKey) throws Exception {
         if (originalFile == null || !Files.isRegularFile(originalFile)) {
-            throw new IllegalArgumentException("Tệp gốc không hợp lệ");
+            throw new IllegalArgumentException("Tệp gốc không tồn tại hoặc không đọc được – vui lòng chọn lại tệp");
         }
-        ensureSignature(signature, "FILE");
+        ensureSignature(signature);
         DSAParameterService.PublicKeyValues keyValues = parameterService.validatePublicKey(publicKey);
         String hashAlgorithm = HashService.normalizeAlgorithm(signature.getHashAlgorithm());
         byte[] currentHash = hashService.digestFile(originalFile, hashAlgorithm);
         String currentHashHex = HashService.toHex(currentHash);
         String initialHash = signature.getFileHash();
+        if (initialHash == null || initialHash.isBlank()) {
+            initialHash = signature.getHash();
+        }
 
         if (initialHash == null || initialHash.isBlank()) {
-            throw new IllegalArgumentException("Tệp chữ ký không đúng định dạng hoặc bị hỏng.");
+            throw new IllegalArgumentException("Tệp chữ ký không chứa mã băm – tệp chữ ký bị hỏng hoặc sai định dạng.");
         }
 
         if (!currentHashHex.equalsIgnoreCase(initialHash)) {
             return VerificationResult.failed(ResultCode.CONTENT_CHANGED,
-                    "Xác thực thất bại: Nội dung đã bị chỉnh sửa sau khi ký.")
+                    "Tệp gốc đã bị chỉnh sửa sau khi ký – nội dung hiện tại không còn khớp với bản được ký.")
                     .withHashes(initialHash, currentHashHex);
         }
 
         VerificationComputation computation = verifyHash(currentHash, signature, keyValues);
         return computation.valid()
-                ? VerificationResult.success("Xác thực thành công")
+                ? VerificationResult.success("Xác thực thành công – tệp còn nguyên vẹn và chữ ký hợp lệ")
                 .withHashes(initialHash, currentHashHex)
                 .withComputation(computation)
                 : VerificationResult.failed(ResultCode.PUBLIC_KEY_OR_SIGNATURE_INVALID,
-                "Xác thực thất bại: Chữ ký không hợp lệ hoặc không khớp với khóa công khai.")
+                "Chữ ký tệp không hợp lệ hoặc không khớp với khóa công khai – có thể chữ ký đã bị sửa đổi hoặc sai khóa.")
                 .withHashes(initialHash, currentHashHex)
                 .withComputation(computation);
     }
 
-    private void ensureSignature(DSASignatureModel signature, String expectedType) {
-        if (signature == null || !"DSA".equalsIgnoreCase(signature.getAlgorithm())
-                || signature.getR() == null || signature.getR().isBlank()
-                || signature.getS() == null || signature.getS().isBlank()) {
-            throw new IllegalArgumentException("Tệp chữ ký không đúng định dạng hoặc bị hỏng.");
+    private void ensureSignature(DSASignatureModel signature) {
+        if (signature == null) {
+            throw new IllegalArgumentException("Chưa tải tệp chữ ký – vui lòng chọn tệp chữ ký JSON");
         }
-        if (!expectedType.equalsIgnoreCase(signature.getDataType())) {
-            throw new IllegalArgumentException("Tệp chữ ký không đúng định dạng hoặc bị hỏng.");
+        if (!"DSA".equalsIgnoreCase(signature.getAlgorithm())) {
+            throw new IllegalArgumentException("Tệp chữ ký không phải định dạng DSA – hãy kiểm tra lại tệp");
+        }
+        if (signature.getR() == null || signature.getR().isBlank()
+                || signature.getS() == null || signature.getS().isBlank()) {
+            throw new IllegalArgumentException("Tệp chữ ký bị hỏng – thiếu giá trị r hoặc s");
         }
     }
 

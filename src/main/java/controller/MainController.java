@@ -30,7 +30,6 @@ public class MainController {
     @FXML private Label clockLabel;
     @FXML private Label currentPageLabel;
     @FXML private Button notificationButton;
-    @FXML private Button manualButton;
     @FXML private Button autoKeyButton;
     @FXML private Button signButton;
     @FXML private Button verifyButton;
@@ -45,7 +44,7 @@ public class MainController {
         startClock();
         startNotificationRefresh();
         updateNotificationButton();
-        loadView("/fxml/manual-parameter.fxml", manualButton, "Tạo tham số DSA");
+        loadView("/fxml/key-management.fxml", autoKeyButton, "Tạo khóa DSA");
     }
 
     @FXML
@@ -72,13 +71,8 @@ public class MainController {
     }
 
     @FXML
-    private void showManualParameter() {
-        loadView("/fxml/manual-parameter.fxml", manualButton, "Tạo tham số DSA");
-    }
-
-    @FXML
     private void showAutoKey() {
-        loadView("/fxml/auto-key.fxml", autoKeyButton, "Quản lý khóa DSA");
+        loadView("/fxml/key-management.fxml", autoKeyButton, "Tạo khóa DSA");
     }
 
     @FXML
@@ -111,7 +105,7 @@ public class MainController {
     }
 
     private void setActiveButton(Button selectedButton) {
-        Button[] buttons = {manualButton, autoKeyButton, signButton, verifyButton, logButton};
+        Button[] buttons = {autoKeyButton, signButton, verifyButton, logButton};
         for (Button button : buttons) {
             button.getStyleClass().remove("nav-button-active");
         }

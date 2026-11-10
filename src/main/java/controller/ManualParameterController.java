@@ -31,6 +31,44 @@ public class ManualParameterController {
     @FXML
     private void handleValidate() {
         DSAParameters parameters = readParameters();
+        
+        String pStr = parameters.getP();
+        String qStr = parameters.getQ();
+        String gStr = parameters.getG();
+        String xStr = parameters.getX();
+        String yStr = parameters.getY();
+        
+        if (pStr != null && !pStr.trim().isEmpty() && qStr != null && !qStr.trim().isEmpty()
+            && (gStr == null || gStr.trim().isEmpty())
+            && (xStr == null || xStr.trim().isEmpty())
+            && (yStr == null || yStr.trim().isEmpty())) {
+            
+            try {
+                java.math.BigInteger p = util.BigIntegerUtil.parseRequired(pStr, "P");
+                java.math.BigInteger q = util.BigIntegerUtil.parseRequired(qStr, "Q");
+                
+                if (p.isProbablePrime(80) && q.isProbablePrime(80) && p.subtract(java.math.BigInteger.ONE).mod(q).equals(java.math.BigInteger.ZERO)) {
+                    java.security.SecureRandom secureRandom = new java.security.SecureRandom();
+                    java.math.BigInteger exponent = p.subtract(java.math.BigInteger.ONE).divide(q);
+                    java.math.BigInteger g;
+                    do {
+                        java.math.BigInteger h = util.BigIntegerUtil.randomBetween(java.math.BigInteger.TWO, p.subtract(java.math.BigInteger.TWO), secureRandom);
+                        g = h.modPow(exponent, p);
+                    } while (g.compareTo(java.math.BigInteger.ONE) <= 0);
+                    
+                    java.math.BigInteger x = util.BigIntegerUtil.randomBetween(java.math.BigInteger.ONE, q.subtract(java.math.BigInteger.ONE), secureRandom);
+                    java.math.BigInteger y = g.modPow(x, p);
+                    
+                    gField.setText(g.toString());
+                    xField.setText(x.toString());
+                    yField.setText(y.toString());
+                    parameters = readParameters();
+                }
+            } catch (Exception e) {
+                // Ignore and let standard validation handle it
+            }
+        }
+        
         DSAParameterService.ParameterValidationResult result = parameterService.validate(parameters);
         if (result.isValid()) {
             parameters.setCreatedAt(DateTimeUtil.nowStorage());
@@ -114,21 +152,15 @@ public class ManualParameterController {
     }
 
     private String formatValidationStatus(DSAParameterService.ParameterValidationResult result) {
-        return statusLine("P", hasError(result, "P"))
-                + "\n" + statusLine("Q", hasError(result, "Q"))
-                + "\n" + statusLine("G", hasError(result, "G"))
-                + "\n" + statusLine("X", hasError(result, "X"))
-                + "\n" + statusLine("Y", hasError(result, "Y"))
-                + (result.isValid() ? "\nTham số hợp lệ" : "\n\n" + String.join("\n", result.getErrors()));
-    }
-
-    private boolean hasError(DSAParameterService.ParameterValidationResult result, String field) {
-        return result.getErrors().stream().anyMatch(error -> error.toUpperCase().startsWith(field)
-                || error.toUpperCase().contains(field + " "));
-    }
-
-    private String statusLine(String field, boolean hasError) {
-        return field + ": " + (hasError ? "không hợp lệ" : "hợp lệ");
+        if (result.isValid()) {
+            return "Tất cả tham số hợp lệ – có thể lưu tệp";
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("Phát hiện ").append(result.getErrors().size()).append(" lỗi:\n");
+        for (String error : result.getErrors()) {
+            sb.append("  • ").append(error).append("\n");
+        }
+        return sb.toString().trim();
     }
 
     private Window window() {

@@ -7,6 +7,7 @@ import javafx.scene.control.ScrollPane;
 import javafx.scene.control.TabPane;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TextField;
+import javafx.scene.layout.HBox;
 import javafx.scene.layout.VBox;
 import javafx.scene.web.WebView;
 import javafx.stage.FileChooser;
@@ -45,6 +46,10 @@ public class SignController {
     @FXML private TextField fileRField;
     @FXML private TextField fileSField;
     @FXML private Label fileStatusMessage;
+    
+    @FXML private HBox topEmptyState;
+    @FXML private HBox topSelectedState;
+    @FXML private VBox emptyStatePreview;
 
     private final DSASignService signService = new DSASignService();
     private final FilePreviewService previewService = new FilePreviewService();
@@ -82,15 +87,18 @@ public class SignController {
     @FXML
     private void handleSignText() {
         try {
+            if (textInput.getText() == null || textInput.getText().isBlank()) {
+                throw new IllegalArgumentException("Vui lòng nhập nội dung văn bản cần ký.");
+            }
             if (textPrivateKey == null) {
-                throw new IllegalArgumentException("Vui lòng chọn khóa bí mật");
+                throw new IllegalArgumentException("Vui lòng chọn tệp khóa bí mật trước khi ký.");
             }
             textSignature = signService.signText(textInput.getText(), textPrivateKey, textHashCombo.getValue());
             textRField.setText(textSignature.getR());
             textSField.setText(textSignature.getS());
             textHashArea.setText(textSignature.getHash());
             LogService.getInstance().addLog("SIGN", "Ký văn bản thành công", "SUCCESS");
-            setTextStatus("Ký văn bản thành công", true);
+            setTextStatus("Ký văn bản thành công – chữ ký r, s đã được tạo", true);
         } catch (Exception ex) {
             LogService.getInstance().addLog("SIGN", "Ký văn bản thất bại: " + ex.getMessage(), "FAIL");
             setTextStatus(ex.getMessage(), false);
@@ -114,6 +122,33 @@ public class SignController {
         textKeyLabel.setText("Chưa chọn khóa bí mật");
         setTextStatus("Đã làm mới phần ký văn bản", true);
     }
+    
+    @FXML
+    private void handleSaveTextContent() {
+        String content = textInput.getText();
+        if (content == null || content.trim().isEmpty()) {
+            AlertUtil.error(window(), "Lỗi lưu văn bản", "Không có nội dung nào để lưu.");
+            return;
+        }
+
+        FileChooser chooser = new FileChooser();
+        chooser.setTitle("Lưu văn bản gốc");
+        chooser.getExtensionFilters().add(new FileChooser.ExtensionFilter("Tệp văn bản", "*.txt"));
+        File file = chooser.showSaveDialog(window());
+        if (file == null) {
+            return;
+        }
+
+        try {
+            java.nio.file.Files.write(file.toPath(), content.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            setTextStatus("Đã lưu văn bản gốc thành công", true);
+            LogService.getInstance().addLog("SIGN", "Lưu văn bản gốc thành công: " + file.getName(), "SUCCESS");
+        } catch (Exception ex) {
+            LogService.getInstance().addLog("SIGN", "Lỗi lưu văn bản gốc: " + ex.getMessage(), "FAIL");
+            AlertUtil.error(window(), "Lỗi lưu tệp", ex.getMessage());
+            setTextStatus("Lưu văn bản thất bại", false);
+        }
+    }
 
     @FXML
     private void handleChooseFile() {
@@ -135,6 +170,12 @@ public class SignController {
             fileLabel.setText(file.getAbsolutePath());
             setFileStatus("Đã đọc thông tin tệp", true);
             filePreviewManager.render(file, info);
+            
+            if(topEmptyState != null) {
+                topEmptyState.setVisible(false); topEmptyState.setManaged(false);
+                topSelectedState.setVisible(true); topSelectedState.setManaged(true);
+                emptyStatePreview.setVisible(false); emptyStatePreview.setManaged(false);
+            }
         } catch (Exception ex) {
             setFileStatus("Không thể đọc tệp: " + ex.getMessage(), false);
             AlertUtil.error(window(), "Lỗi đọc tệp", ex.getMessage());
@@ -155,16 +196,16 @@ public class SignController {
     private void handleSignFile() {
         try {
             if (selectedFile == null) {
-                throw new IllegalArgumentException("Vui lòng chọn tệp cần ký");
+                throw new IllegalArgumentException("Vui lòng chọn tệp cần ký trước.");
             }
             if (filePrivateKey == null) {
-                throw new IllegalArgumentException("Vui lòng chọn khóa bí mật");
+                throw new IllegalArgumentException("Vui lòng chọn tệp khóa bí mật trước khi ký.");
             }
             fileSignature = signService.signFile(selectedFile.toPath(), filePrivateKey, fileHashCombo.getValue());
             fileRField.setText(fileSignature.getR());
             fileSField.setText(fileSignature.getS());
             LogService.getInstance().addLog("SIGN", "Ký tệp " + selectedFile.getName() + " thành công", "SUCCESS");
-            setFileStatus("Ký tệp thành công", true);
+            setFileStatus("Ký tệp thành công – chữ ký r, s đã được tạo", true);
         } catch (Exception ex) {
             LogService.getInstance().addLog("SIGN", "Ký tệp thất bại: " + ex.getMessage(), "FAIL");
             setFileStatus(ex.getMessage(), false);
@@ -182,12 +223,18 @@ public class SignController {
         selectedFile = null;
         fileSignature = null;
         filePrivateKey = null;
-        fileLabel.setText("Chưa chọn tệp");
+        fileLabel.setText("Chưa có tệp nào được chọn");
         fileKeyLabel.setText("Chưa chọn khóa bí mật");
         filePreviewManager.clear();
         fileRField.clear();
         fileSField.clear();
         setFileStatus("Đã làm mới phần ký tệp", true);
+        
+        if(topEmptyState != null) {
+            topEmptyState.setVisible(true); topEmptyState.setManaged(true);
+            topSelectedState.setVisible(false); topSelectedState.setManaged(false);
+            emptyStatePreview.setVisible(true); emptyStatePreview.setManaged(true);
+        }
     }
 
     @FXML
